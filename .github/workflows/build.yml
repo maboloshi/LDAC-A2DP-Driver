@@ -113,7 +113,10 @@ jobs:
         shell: pwsh
         run: |
           $t = 'C:\Program Files (x86)\Windows Kits\10\build\10.0.26100.0\WindowsDriver.common.targets'
-          Get-Content $t | Select-Object -Skip 1385 -First 55
+          $n = (Select-String -Path $t -Pattern 'Target Name="DriverPackageTarget"').LineNumber
+          "DriverPackageTarget at line $n"
+          Get-Content $t | Select-Object -Skip ($n-1) -First 75
+          Select-String -Path $t -Pattern 'Inf2CatSource' | ForEach-Object { "L$($_.LineNumber): $($_.Line.Trim())" }
 
       # 编译整个 sln 里的 LDACDriver 目标，这样 $(SolutionDir) 才有值，
       # 产物落在 build\Release\driver\。
