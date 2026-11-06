@@ -1,9 +1,7 @@
 name: build
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
+  # 仅手动触发：Actions 页面 Run workflow，或 gh workflow run build.yml
   workflow_dispatch:
 
 permissions:
@@ -95,6 +93,9 @@ jobs:
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
+        with:
+          # WDK 10.0.26100 只提供 x64/arm64 的 infverif，32 位 MSBuild 会去找不存在的 x86\InfVerif.dll
+          msbuild-architecture: x64
 
       - name: Clean stale incremental state
         shell: pwsh
@@ -115,7 +116,7 @@ jobs:
       # 编译整个 sln 里的 LDACDriver 目标，这样 $(SolutionDir) 才有值，
       # 产物落在 build\Release\driver\。
       - name: Build driver (Release | x64)
-        run: msbuild LDACDriver.sln /t:LDACDriver /p:Configuration=Release /p:Platform=x64 /m /v:minimal /nologo
+        run: msbuild LDACDriver.sln /t:LDACDriver /p:Configuration=Release /p:Platform=x64 /p:SignMode=Off /m /v:minimal /nologo
 
       - name: Upload driver artifacts
         if: always()
