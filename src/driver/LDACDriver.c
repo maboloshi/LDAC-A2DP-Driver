@@ -282,6 +282,7 @@ LDACReadConfiguration(
     NTSTATUS status;
     WDFKEY key;
     ULONG value;
+    DECLARE_CONST_UNICODE_STRING(valueName, L"PreferredBitrate");
 
     status = WdfDriverOpenParametersRegistryKey(WdfDeviceGetDriver(DeviceExtension->Device), 
                                                KEY_READ, 
@@ -291,7 +292,7 @@ LDACReadConfiguration(
         return status;
     }
 
-    status = WdfRegistryQueryULong(key, L"PreferredBitrate", &value);
+    status = WdfRegistryQueryULong(key, &valueName, &value);
     if (NT_SUCCESS(status)) {
         DeviceExtension->CurrentBitrate = value;
     }
