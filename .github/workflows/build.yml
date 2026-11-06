@@ -80,18 +80,18 @@ jobs:
             src/gui/bin/Release/**
 
   # ---------------------------------------------------------------------------
-  # KMDF 驱动：windows-2022 镜像已预装 WDK + WDK VS 扩展 + 10.0.26100 SDK，
-  # 不需要额外安装。
+  # KMDF 驱动：windows-2022 镜像已预装 WDK + WDK VS 扩展 + 10.0.26100 SDK。
   #
-  # 注意：当前源码编译不过 —— LDACDriver.h 里没有 wdf.h/ntddk.h，也没有 .c
-  # 用到的 LDAC_DEVICE_EXTENSION / LDAC_BITRATE_990 / IOCTL_LDAC_* 等定义；
-  # vcxproj 还引用了不存在的 trace.h（WPP）。修好之后把下面的
-  # continue-on-error 删掉，这个 job 就能作为正式门禁。
+  # 已知的 runner 限制：
+  #  * WDK 10.0.26100 只提供 x64/arm64 的 infverif，32 位 MSBuild 会去找不存在的
+  #    x86\InfVerif.dll —— 所以这里用 x64 MSBuild。
+  #  * 没有代码签名证书，所以 SignMode=Off；同时关掉 inf2cat（catalog 生成），
+  #    否则它会因为打包目录里缺 .sys 而失败。需要出 .cat 时请在有证书的环境里
+  #    打开 inf2cat 并走签名流程。
   # ---------------------------------------------------------------------------
   driver:
-    name: KMDF driver (expected to fail until header fixed)
+    name: KMDF driver (Release | x64)
     runs-on: windows-2022
-    continue-on-error: true
 
     steps:
       - name: Checkout
@@ -107,20 +107,10 @@ jobs:
         shell: pwsh
         run: Remove-Item 'src/driver/build' -Recurse -Force -ErrorAction SilentlyContinue
 
-      # 临时诊断：WDK 10.0.26100 的 InfVerif 任务在 runner 上加载 DLL 失败，先看清它从哪儿找文件
-      - name: Diagnose InfVerif tooling
-        if: always()
-        shell: pwsh
-        run: |
-          $t = 'C:\Program Files (x86)\Windows Kits\10\build\10.0.26100.0\WindowsDriver.common.targets'
-          Select-String -Path $t -Pattern 'Inf2CatSource' | ForEach-Object { "TARGETS:L$($_.LineNumber): $($_.Line.Trim())" }
-          Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\build\10.0.26100.0\*.props' |
-            Select-String -Pattern 'Inf2CatSource|PackageDir' | ForEach-Object { "$($_.Filename):L$($_.LineNumber): $($_.Line.Trim())" }
-
       # 编译整个 sln 里的 LDACDriver 目标，这样 $(SolutionDir) 才有值，
       # 产物落在 build\Release\driver\。
       - name: Build driver (Release | x64)
-        run: msbuild LDACDriver.sln /t:LDACDriver /p:Configuration=Release /p:Platform=x64 /p:SignMode=Off /m /v:minimal /nologo
+        run: msbuild LDACDriver.sln /t:LDACDriver /p:Configuration=Release /p:Platform=x64 /p:SignMode=Off /p:EnableInf2cat=false /m /v:minimal /nologo
 
       - name: Upload driver artifacts
         if: always()
