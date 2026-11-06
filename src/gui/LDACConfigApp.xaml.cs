@@ -83,7 +83,7 @@ namespace LDACConfigApp
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Fallback
                 devices.Add(new BluetoothDevice
