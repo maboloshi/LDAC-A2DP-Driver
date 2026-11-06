@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.Versioning;
 using System.ServiceProcess;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,13 +9,12 @@ using System.Diagnostics;
 
 namespace LDACDriver.Service
 {
+    [SupportedOSPlatform("windows")]
     public class LDACService : ServiceBase
     {
         private Timer _monitorTimer;
         private readonly TimeSpan _monitorInterval = TimeSpan.FromSeconds(5);
         private readonly string _serviceName = "LDACA2DPService";
-        private readonly string _displayName = "LDAC A2DP Audio Service";
-        private readonly string _description = "Provides LDAC codec support for Bluetooth A2DP devices";
 
         public LDACService()
         {

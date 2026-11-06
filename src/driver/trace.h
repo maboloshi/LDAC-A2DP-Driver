@@ -9,3 +9,6 @@
         WPP_DEFINE_BIT(TRACE_DEVICE)                                          \
         WPP_DEFINE_BIT(TRACE_QUEUE)                                           \
         )
+
+// begin_wpp config
+// end_wpp

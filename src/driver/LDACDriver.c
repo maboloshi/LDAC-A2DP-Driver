@@ -42,6 +42,8 @@ EvtDeviceAdd(
     PLDAC_DEVICE_EXTENSION deviceExtension;
     WDF_IO_QUEUE_CONFIG queueConfig;
 
+    UNREFERENCED_PARAMETER(Driver);
+
     // Set device type
     WdfDeviceInitSetDeviceType(DeviceInit, FILE_DEVICE_BLUETOOTH);
 
