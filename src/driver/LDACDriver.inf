@@ -9,6 +9,7 @@ ClassGuid={c166523c-fe0c-4a94-a586-f1a80cfbbf3e}
 Provider=%ProviderName%
 DriverVer=06/20/2024,1.0.0.0
 CatalogFile=LDACDriver.cat
+PnpLockdown=1
 
 [SourceDisksNames]
 1 = "LDAC Driver Installation Disk",,,
@@ -38,6 +39,16 @@ HKR,,NTMPDriver,,LDACDriver.sys
 HKR,"Parameters","LDACEnabled",0x00010001,1
 HKR,"Parameters","PreferredBitrate",0x00010001,990000
 HKR,"Parameters","ForceLDAC",0x00010001,1
+
+[LDAC_Install.Services]
+AddService=LDACDriver,0x00000002,LDAC_ServiceInstall
+
+[LDAC_ServiceInstall]
+DisplayName=%ServiceName%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%12%\LDACDriver.sys
 
 [Strings]
 ProviderName="LDAC Driver Team"

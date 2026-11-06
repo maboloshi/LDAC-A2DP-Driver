@@ -29,6 +29,12 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 6.0.x
+          # 只缓存 NuGet 包；obj/bin 不缓存（本工作流每次都会先清理）
+          cache: true
+          cache-dependency-path: |
+            src/service/LDACService.csproj
+            src/gui/LDACConfigApp.csproj
+            src/tests/LDACDriver.Tests.csproj
 
       # 仓库里误提交了 obj/bin（有些还是原作者机器上的绝对路径），先清掉再还原，
       # 否则增量状态会让 restore/build 用错缓存。
