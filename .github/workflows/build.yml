@@ -1,0 +1,114 @@
+name: build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 托管服务 + WPF 配置界面：仓库的目标框架是 net6.0，而 windows-2022 镜像只预装
+  # 8/9/10 的 SDK，所以这里显式装 6.0.x。
+  # ---------------------------------------------------------------------------
+  dotnet:
+    name: .NET (service + GUI)
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 6
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 6.0.x
+
+      # 仓库里误提交了 obj/bin（有些还是原作者机器上的绝对路径），先清掉再还原，
+      # 否则增量状态会让 restore/build 用错缓存。
+      - name: Clean committed obj/bin
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path $env:GITHUB_WORKSPACE -Recurse -Directory -Include obj, bin -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch '\\\.git\\' } |
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+      - name: Restore
+        shell: pwsh
+        run: |
+          foreach ($p in @(
+            'src/service/LDACService.csproj',
+            'src/gui/LDACConfigApp.csproj',
+            'src/tests/LDACDriver.Tests.csproj'
+          )) {
+            dotnet restore $p
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Build service
+        run: dotnet build src/service/LDACService.csproj -c Release --no-restore
+
+      - name: Build GUI
+        run: dotnet build src/gui/LDACConfigApp.csproj -c Release --no-restore
+
+      # 测试项目引用了 LDACManager，但仓库里没有这个类（CS0103），现在必然编译失败。
+      # 补齐后把 continue-on-error 删掉即可纳入门禁。
+      - name: "Build tests (expected to fail - missing LDACManager)"
+        continue-on-error: true
+        run: dotnet build src/tests/LDACDriver.Tests.csproj -c Release --no-restore
+
+      - name: Upload app artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ldac-apps-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            src/service/bin/Release/**
+            src/gui/bin/Release/**
+
+  # ---------------------------------------------------------------------------
+  # KMDF 驱动：windows-2022 镜像已预装 WDK + WDK VS 扩展 + 10.0.26100 SDK，
+  # 不需要额外安装。
+  #
+  # 注意：当前源码编译不过 —— LDACDriver.h 里没有 wdf.h/ntddk.h，也没有 .c
+  # 用到的 LDAC_DEVICE_EXTENSION / LDAC_BITRATE_990 / IOCTL_LDAC_* 等定义；
+  # vcxproj 还引用了不存在的 trace.h（WPP）。修好之后把下面的
+  # continue-on-error 删掉，这个 job 就能作为正式门禁。
+  # ---------------------------------------------------------------------------
+  driver:
+    name: KMDF driver (expected to fail until header fixed)
+    runs-on: windows-2022
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Clean stale incremental state
+        shell: pwsh
+        run: Remove-Item 'src/driver/build' -Recurse -Force -ErrorAction SilentlyContinue
+
+      # 编译整个 sln 里的 LDACDriver 目标，这样 $(SolutionDir) 才有值，
+      # 产物落在 build\Release\driver\。
+      - name: Build driver (Release | x64)
+        run: msbuild LDACDriver.sln /t:LDACDriver /p:Configuration=Release /p:Platform=x64 /m /v:minimal /nologo
+
+      - name: Upload driver artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ldac-driver-${{ github.sha }}
+          if-no-files-found: warn
+          path: build/Release/driver/**
